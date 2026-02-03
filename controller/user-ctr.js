@@ -29,8 +29,8 @@ export const registerUser = async (req, res) => {
 
     // Basic validations
     if (!fullName || !email || !password)
-      return res.status(400).json({
-        message: "Fullname, email and password are required for registration",
+      return res.status(403).json({
+        message: "fullname, email and password are required for registration",
       });
 
     if (password.length < 5)
@@ -116,11 +116,11 @@ export const registerUser = async (req, res) => {
 
     // // ✅ Send email with Brevo
     // await brevoEmailApi.sendTransacEmail(emailData);
-
+    const purpose = "Email Verification";
     const mailOptions = {
-      from: `"BarondeMusical" <${process.env.EMAIL_USER_NAME}>`,
+      from: `"Making A Difference Tech Hub" <${process.env.EMAIL_USER_NAME}>`,
       to: email,
-      subject: `BarondeMusical - ${purpose}`,
+      subject: `MDTH - ${purpose}`,
       html: htmlContent,
     };
 
@@ -161,7 +161,7 @@ export const verifyEmail = async (req, res) => {
         .json({ message: "No pendingUser verification found" });
 
     // 🔢 Compare OTP
-    if (pendingUser.verificationCode !== Number(otp))
+    if (pendingUser.verificationCode !== otp.toString())
       return res.status(400).json({ message: "Invalid OTP" });
 
     // ⏰ Check expiration (10 minutes)

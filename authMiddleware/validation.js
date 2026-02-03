@@ -3,7 +3,7 @@ import Joi from "joi";
 export const validateRegistration = (req, res, next) => {
   // validates if the values from req.body matches the conditions defined here, like name being between 2 and 50 chars and being compulsorily present ie required, email being in email format, the accepted format of phone numbers etc.
   const schema = Joi.object({
-    fullname: Joi.string().min(2).max(50).required(),
+    fullName: Joi.string().min(2).max(50).required(),
     email: Joi.string().email().required(),
     username: Joi.string().min(3).max(30),
     password: Joi.string().min(6).required(),
@@ -11,6 +11,7 @@ export const validateRegistration = (req, res, next) => {
       .pattern(/^\+?[0-9]{10,15}$/)
       .required(),
     country: Joi.string(),
+    acceptedTerms: Joi.string(),
     state: Joi.string(),
     role: Joi.string()
       .valid("student", "tutor", "admin")
@@ -30,7 +31,7 @@ export const validateRegistration = (req, res, next) => {
 
 export const validateUpdate = (req, res, next) => {
   const schema = Joi.object({
-    fulname: Joi.string().min(2).max(50).optional(),
+    fulName: Joi.string().min(2).max(50).optional(),
     email: Joi.string().email().optional(),
     username: Joi.string().min(3).max(30),
     password: Joi.string().min(6).optional(),

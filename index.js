@@ -11,30 +11,30 @@ import userRoute from "./Router/user-routes.js";
 const app = express();
 
 // restrict to my dev origin
-// const AllowedOrigins = [
-//   process.env.ORIGIN_LOCAL,
-//   process.env.ORIGIN_VERCEL,
-//   process.env.ORIGIN_HOSTED_FRONTEND,
-// ].filter(Boolean); // Remove empty values
+const AllowedOrigins = [
+  process.env.ORIGIN_LOCAL,
+  process.env.ORIGIN_VERCEL,
+  process.env.ORIGIN_HOSTED_FRONTEND,
+].filter(Boolean); // Remove empty values
 
 //Middleware
 app.use(express.json());
 
-// app.use(
-//   cors({
-//     origin: function (origin, callback) {
-//       if (!origin) return callback(null, true); //mobile apps, postman
-//       if (AllowedOrigins.includes(origin)) {
-//         return callback(null, true);
-//       } else {
-//         return callback(new Error("Not Allowed by CORS"));
-//       }
-//     },
-//     credentials: true,
-//     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-//     allowedHeaders: ["Content-Type", "Authorization"],
-//   }),
-// );
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); //mobile apps, postman
+      if (AllowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not Allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -47,8 +47,6 @@ app.use("/api/", limiter);
 app.use("/api/user", userRoute);
 // app.use("/api/course", courseRoute);
 // app.use("/api/cohort", cohortRoute);
-// app.use("/api/user", userRoute);
-// app.use("/api/product", product);
 app.get("/", (req, res) => {
   res.send("You have reached the backend for my MDTH project");
 });
