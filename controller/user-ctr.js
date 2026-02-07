@@ -12,7 +12,7 @@ import crypto from "crypto";
 import User from "../model/user-model.js";
 
 const generateOTP = () => {
-  return crypto.randomInt(10000, 99999).toString();
+  return crypto.randomInt(100000, 999999).toString();
 };
 
 // Temporary in-memory store for unverified users
@@ -20,7 +20,7 @@ const pendingUsers = new Map();
 
 /**
  * REGISTER USER (Stage 1)
- * Generate OTP and send verification email using Brevo.
+ * Generate OTP and send verification email 
  */
 export const registerUser = async (req, res) => {
   try {
@@ -124,9 +124,17 @@ export const registerUser = async (req, res) => {
       html: htmlContent,
     };
 
-    await sendmail(mailOptions);
-
-    console.log(`✅ Verification email sent to ${email}`);
+    // send email but do not block registration flow on SMTP timeouts/errors
+    sendmail(mailOptions)
+      .then((info) =>
+        console.log(
+          `✅ Verification email sent to ${email}`,
+          info?.messageId || "",
+        ),
+      )
+      .catch((err) =>
+        console.error("Failed to send verification email (non-blocking):", err),
+      );
 
     // ✅ Send success response
     res.status(200).json({
@@ -249,6 +257,31 @@ export const loginUser = async (req, res) => {
   } catch (error) {
     console.error("❌ Login error:", error);
     res.status(500).json({ message: "Login failed", error: error.message });
+  }
+};
+
+// Verify token endpoint — used by frontend to validate JWT
+export const verifyToken = async (req, res) => {
+  try {
+    // `authenticate` middleware attaches the user to req.user
+    if (!req.user)
+      return res.status(401).json({ message: "Not authenticated" });
+
+    return res.status(200).json({
+      message: "Token valid",
+      user: {
+        id: req.user._id,
+        fullName: req.user.fullName,
+        email: req.user.email,
+        role: req.user.role,
+        photo: req.user.profilePhoto,
+      },
+    });
+  } catch (error) {
+    console.error("❌ verifyToken error:", error);
+    return res
+      .status(500)
+      .json({ message: "Token verification failed", error: error.message });
   }
 };
 
