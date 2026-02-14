@@ -18,9 +18,31 @@ const generateOTP = () => {
 // Temporary in-memory store for unverified users
 const pendingUsers = new Map();
 
+//define sendMail
+const sendMail = (purpose, email, htmlContent) => {
+  const mailOptions = {
+    from: `"Making A Difference Tech Hub" <${process.env.EMAIL_USER_NAME}>`,
+    to: email,
+    subject: `MDTH - ${purpose}`,
+    html: htmlContent,
+  };
+
+  // send email but do not block registration flow on SMTP timeouts/errors
+  sendmail(mailOptions)
+    .then((info) =>
+      console.log(
+        `✅ ${purpose} email sent to ${email}`,
+        info?.messageId || "",
+      ),
+    )
+    .catch((err) =>
+      console.error(`Failed to send ${purpose} email (non-blocking):`, err),
+    );
+};
+
 /**
  * REGISTER USER (Stage 1)
- * Generate OTP and send verification email 
+ * Generate OTP and send verification email
  */
 export const registerUser = async (req, res) => {
   try {
@@ -49,26 +71,6 @@ export const registerUser = async (req, res) => {
         .status(400)
         .json({ message: "Email already registered, proceed to login" });
 
-    // ✅ Upload profile photo if provided
-    // let profilePhoto = "";
-    // if (req.file && req.file.buffer) {
-    //   const uploadResult = await new Promise((resolve, reject) => {
-    //     const stream = cloudinary.uploader.upload_stream(
-    //       {
-    //         folder: "hgsc_users",
-    //         transformation: [{ width: 500, height: 500, crop: "fill" }],
-    //       },
-    //       (error, result) => {
-    //         if (error) reject(error);
-    //         else resolve(result);
-    //       },
-    //     );
-    //     streamifier.createReadStream(req.file.buffer).pipe(stream);
-    //   });
-
-    //   profilePhoto = uploadResult.secure_url;
-    // }
-
     // ✅ Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -89,11 +91,6 @@ export const registerUser = async (req, res) => {
       createdAt: Date.now(),
     });
 
-    // ✅ Setup Brevo client here
-    // const defaultClient = SibApiV3Sdk.ApiClient.instance;
-    // defaultClient.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
-    // const brevoEmailApi = new SibApiV3Sdk.TransactionalEmailsApi();
-
     // ✅ Construct email content
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; line-height:1.6;">
@@ -107,34 +104,8 @@ export const registerUser = async (req, res) => {
       </div>
     `;
 
-    // const emailData = {
-    //   sender: { email: process.env.EMAIL_SENDER, name: "MDTH" },
-    //   to: [{ email, name: fullName }],
-    //   subject: "Verify Your MDTH student Account",
-    //   htmlContent,
-    // };
-
-    // // ✅ Send email with Brevo
-    // await brevoEmailApi.sendTransacEmail(emailData);
     const purpose = "Email Verification";
-    const mailOptions = {
-      from: `"Making A Difference Tech Hub" <${process.env.EMAIL_USER_NAME}>`,
-      to: email,
-      subject: `MDTH - ${purpose}`,
-      html: htmlContent,
-    };
-
-    // send email but do not block registration flow on SMTP timeouts/errors
-    sendmail(mailOptions)
-      .then((info) =>
-        console.log(
-          `✅ Verification email sent to ${email}`,
-          info?.messageId || "",
-        ),
-      )
-      .catch((err) =>
-        console.error("Failed to send verification email (non-blocking):", err),
-      );
+    sendMail(purpose, email, htmlContent);
 
     // ✅ Send success response
     res.status(200).json({
@@ -204,6 +175,49 @@ export const verifyEmail = async (req, res) => {
     // 🧹 Remove from pendingUser memory
     pendingUsers.delete(email);
 
+    const fullName = user.fullName || pendingUser.fullName;
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; line-height:1.6;">
+        <h2 style="color: green;">Welcome, ${fullName}👋</h2>
+        <p>Congratulations for registering with <strong>Making a Difference Tech Hub (MDTH)</strong>, the future of Tech-Learning. Take a look at the next steps to start off your tech journey</p><br><br>
+        <p>We’re excited to have you join our learning community — a platform built to equip you with relevant, up-to-date, and in-demand tech skills using standardized, industry-aligned curricula.
+
+        Here, learning goes beyond theory. Our courses are carefully designed to help you gain practical, job-ready skills and real-world confidence in areas such as:</p>
+        <ul>
+        <li><strong>Web development</strong><li><br>
+        <li><strong>Programming</strong><li><br>
+        <li><strong>Artificial Intelligence (AI)</strong><li><br>
+        <li><strong>Cybersecurity</strong><li><br>
+        <li><strong>Data Analytics</strong><li><br>
+        <li><strong>Graphic Design</strong><li><br>
+        <li><strong>Video editing</strong><li><br>
+        <li><strong>Project Management</strong><li><br>
+        </ul><p> And a lot more!</p>
+        <p>Each program is structured for clarity, depth, and measurable results, ensuring you learn what actually matters in today’s fast-changing tech industry.
+
+        Whether you’re starting from scratch or advancing your career, you’re now part of a platform committed to:
+        
+        High-quality instruction
+        
+        Modern tools and technologies
+        
+        Structured learning paths
+        
+        Skills that translate into real outcomes
+        
+        Your journey starts now — explore your courses, stay consistent, and make the most of the resources available to you.
+        
+        We’re glad you’re here, and we look forward to seeing what you build 🚀
+        
+        Welcome aboard!</p>
+      </div>
+    `;
+
+    const purpose = "Welcome";
+
+    sendMail(purpose, email, htmlContent);
+
     // ✅ Response
     res.status(200).json({
       message:
@@ -238,7 +252,7 @@ export const loginUser = async (req, res) => {
       });
 
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, role: user.role, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: "1d" },
     );
@@ -468,12 +482,16 @@ export const updateProfile = async (req, res) => {
 //get my profile
 export const getUser = async (req, res) => {
   try {
+    // Try using redis to cache db queries and reduce api response time for future queries
+    const cached = await req.redisClient.get(`user:${id}`);
+    if (cached) return res.status(200).json(JSON.parse(cached));
     const user = await User.findById(req.user.id).select("-password");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
+    await req.redisClient.setEx(`user:${id}`, 60, JSON.stringify(user));
     res.status(200).json({
       id: user._id,
       fullName: user.fullName,
@@ -499,38 +517,29 @@ export const forgotPassword = async (req, res) => {
     if (!user) return res.status(404).json({ message: "Email Does not Exist" });
 
     // 🔢 Generate 6-digit OTP
-    const resetCode = Math.floor(100000 + Math.random() * 900000);
+    const resetCode = generateOTP();
 
     // ⏰ Expires in 10 minutes
     user.resetPasswordCode = resetCode;
-    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; //10 minutes
 
     await user.save();
 
     // ✉️ Email content
+
     const htmlContent = `
       <div style="font-family: Arial; line-height:1.6;">
         <h2>Password Reset Request 🔐</h2>
         <p>Hello ${user.fullName},</p>
         <p>Your password reset code is:</p>
-        <h1 style="background:#0a7;color:#fff;padding:10px;border-radius:8px;">
+        <h1 style="background:#0a7;color:#fff;padding:10px;border-radius:8px;justify-content:center;align-items:center;">
           ${resetCode}
         </h1>
         <p>This code expires in <b>10 minutes</b>.</p>
       </div>
     `;
-
-    const emailData = {
-      sender: {
-        email: process.env.EMAIL_SENDER,
-        name: "HGSC² Digital Skills",
-      },
-      to: [{ email: user.email, name: user.fullName }],
-      subject: "Reset Your Password",
-      htmlContent,
-    };
-
-    await brevoEmailApi.sendTransacEmail(emailData);
+    const purpose = "Password Reset";
+    sendMail(purpose, email, htmlContent);
 
     res.status(200).json({
       message: "Password reset code sent to your email",
