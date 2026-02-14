@@ -31,6 +31,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: function (origin, callback) {
+console.log("CORS request from:", origin);
       if (!origin) return callback(null, true); //mobile apps, postman
       if (AllowedOrigins.includes(origin)) {
         return callback(null, true);
