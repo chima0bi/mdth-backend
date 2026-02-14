@@ -50,7 +50,7 @@ const limiter = rateLimit({
 });
 
 //Create Redis client
-await redisSetup();
+// await redisSetup();
 
 app.use("/api/", limiter);
 
